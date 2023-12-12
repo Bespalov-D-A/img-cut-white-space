@@ -1,0 +1,93 @@
+const isAlmostWhite = (r, g, b, alpha, whiteThreshold = 250, alphaThreshold = 200) => r > whiteThreshold && g > whiteThreshold && b > whiteThreshold && alpha > alphaThreshold;
+
+const rowBlank = (imageData, width, y, whiteThreshold, alphaThreshold) => {
+  for (let x = 0; x < width; x++) {
+    const index = (y * width + x) * 4;
+    if (!isAlmostWhite(
+      imageData.data[index],
+      imageData.data[index + 1],
+      imageData.data[index + 2],
+      imageData.data[index + 3],
+      whiteThreshold,
+      alphaThreshold
+    )) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const columnBlank = (imageData, width, x, top, bottom, whiteThreshold, alphaThreshold) => {
+  for (let y = top; y < bottom; y++) {
+    const index = (y * width + x) * 4;
+    if (!isAlmostWhite(
+      imageData.data[index],
+      imageData.data[index + 1],
+      imageData.data[index + 2],
+      imageData.data[index + 3],
+      whiteThreshold,
+      alphaThreshold
+    )) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const resizeAndTrimImage = (context, image, whiteThreshold, alphaThreshold) => {
+  const max_width = 320;
+  const ratio = image.width > max_width ? max_width / image.width : 1;
+  const newWidth = image.width * ratio;
+  const newHeight = image.height * ratio;
+
+  const temporaryCanvas = document.createElement('canvas');
+  const tContext = temporaryCanvas.getContext('2d');
+  temporaryCanvas.width = newWidth;
+  temporaryCanvas.height = newHeight;
+  tContext.drawImage(image, 0, 0, newWidth, newHeight);
+
+  const imageData = tContext.getImageData(0, 0, newWidth, newHeight);
+  let top = 0;
+    let bottom = newHeight;
+    let left = 0;
+    let right = newWidth;
+
+  while (top < bottom && rowBlank(imageData, newWidth, top, whiteThreshold, alphaThreshold)) {
+    top++;
+  }
+  while (bottom - 1 > top && rowBlank(imageData, newWidth, bottom - 1, whiteThreshold, alphaThreshold)) {
+    bottom--;
+  }
+  while (left < right && columnBlank(imageData, newWidth, left, top, bottom, whiteThreshold, alphaThreshold)) {
+    left++;
+  }
+  while (right - 1 > left && columnBlank(imageData, newWidth, right - 1, top, bottom, whiteThreshold, alphaThreshold)) {
+    right--;
+  }
+
+  const trimmedWidth = right - left;
+  const trimmedHeight = bottom - top;
+  const trimmed = tContext.getImageData(left, top, trimmedWidth, trimmedHeight);
+
+  context.canvas.width = trimmedWidth;
+  context.canvas.height = trimmedHeight;
+  context.putImageData(trimmed, 0, 0);
+};
+
+const ImageComponent = ({ src }) => {
+  const canvasReference = useRef(null);
+
+  useEffect(() => {
+    const image = new Image();
+    image.src = src;
+    image.addEventListener('load', () => {
+      const canvas = canvasReference.current;
+      const context = canvas.getContext('2d');
+      resizeAndTrimImage(context, image, 250, 200);
+    });
+  }, [src]);
+
+  return <canvas ref={canvasReference} />;
+};
+
+ <ImageComponent src={currentImageModel?.FullSizeImageUrl} />
